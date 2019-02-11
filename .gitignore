@@ -1,0 +1,5 @@
+.idea
+.DS_Store
+
+standard-api/db/data
+standard-api/standard-api
