@@ -22,6 +22,8 @@ func NewDAO(db *sql.DB) *DAO {
 	return &DAO{db: db}
 }
 
+// Createはmの値で新規レコードをDBに保存する。
+// IDを含んだModelのインスタンスを返却する。
 func (d *DAO) Create(m *Model) (*Model, error) {
 	res, err := d.db.Exec(createStmt, m.Name)
 	if err != nil {
@@ -37,6 +39,7 @@ func (d *DAO) Create(m *Model) (*Model, error) {
 	return m, nil
 }
 
+// Deleteはidに指定されるエンティティを削除する。成功する場合はtrueを返却する。
 func (d *DAO) Delete(id int64) (bool, error) {
 	res, err := d.db.Exec(deleteStmt, id)
 	if err != nil {
@@ -51,6 +54,8 @@ func (d *DAO) Delete(id int64) (bool, error) {
 	return affected > 0, nil
 }
 
+// FindAllは複数のModelを返却する。offset（開始位置）と
+// limit（行数）でページネーション行う。
 func (d *DAO) FindAll(offset, limit int) ([]Model, error) {
 	var models []Model
 
@@ -74,6 +79,8 @@ func (d *DAO) FindAll(offset, limit int) ([]Model, error) {
 	return models, nil
 }
 
+// FindByIDはIDに指定されたModelを返却する。
+// 存在しない場合はnilを返却する。
 func (d *DAO) FindByID(id int64) (*Model, error) {
 	var model Model
 
@@ -88,6 +95,8 @@ func (d *DAO) FindByID(id int64) (*Model, error) {
 	return &model, nil
 }
 
+// UpdateはmのDBレコードを更新する。
+// m.IDのModelが存在しない、または変更点がない場合はnilを返却する。
 func (d *DAO) Update(m *Model) (*Model, error) {
 	res, err := d.db.Exec(updateStmt, m.Name, m.ID)
 	if err != nil {
