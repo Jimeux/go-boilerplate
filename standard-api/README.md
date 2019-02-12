@@ -28,7 +28,7 @@ curl -i -X "POST" -H "Content-Type: application/json" -d '{"name":"My Name"}' "h
 
 `DELETE /model/destroy`
 ```
-curl -i -X "DELETE" "http://localhost:8080/model/destroy?id={int}"
+curl -i -X "DELETE" "http://localhost:8080/model/destroy?id=1"
 ```
 
 `PUT /model/edit`
@@ -38,10 +38,10 @@ curl -i -X "PUT" -H "Content-Type: application/json" -d '{"id":1,"name":"Updated
 
 `GET /model/index`
 ```
-curl -i -X "GET" "http://localhost:8080/model/index?page={int}&perPage={int}"
+curl -i -X "GET" "http://localhost:8080/model/index?page=1&perPage=5"
 ```
 
 `GET /model/show/:id`
 ```
-curl -i -X "GET" "http://localhost:8080/model/show?id={int}"
+curl -i -X "GET" "http://localhost:8080/model/show?id=2"
 ```

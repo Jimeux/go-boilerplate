@@ -35,5 +35,6 @@ func main() {
 	http.HandleFunc("/model/index", controller.Index)
 	http.HandleFunc("/model/show", controller.Show)
 
+	log.Println("Starting server at localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
