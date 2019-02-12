@@ -143,6 +143,7 @@ func (c *Controller) Show(w http.ResponseWriter, r *http.Request) {
 	writeJSON(&model, w)
 }
 
+// writeJSONはdataをJSONにエンコードしwに書き込む。
 func writeJSON(data interface{}, w http.ResponseWriter) {
 	body, err := json.Marshal(data)
 	if err != nil {
