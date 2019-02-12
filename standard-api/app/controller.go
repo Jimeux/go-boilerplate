@@ -64,6 +64,32 @@ func (c *Controller) Destroy(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (c *Controller) Edit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		w.WriteHeader(http.StatusNotFound)
+	}
+
+	var m Model
+	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		log.Print(err)
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		return
+	}
+
+	updated, err := c.dao.Update(&m)
+	if err != nil {
+		log.Print(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if updated == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(&updated, w)
+}
+
 func (c *Controller) Index(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusNotFound)

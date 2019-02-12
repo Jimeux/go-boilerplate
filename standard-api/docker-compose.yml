@@ -6,8 +6,8 @@ services:
     ports:
       - 33306:3306
     volumes:
-      - ./db/data:/var/lib/mysql
-      - ./db/init:/docker-entrypoint-initdb.d
+      - ./db/data:/var/lib/mysql # データ永続化用のディレクトリ
+      - ./db/init:/docker-entrypoint-initdb.d # 初期化用のSQLスクリプトのディレクトリ
     environment:
       MYSQL_DATABASE: standard_api
       MYSQL_USER: dev

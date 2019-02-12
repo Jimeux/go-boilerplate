@@ -8,6 +8,7 @@ import (
 const (
 	createStmt = "insert into model (name) values (?)"
 	deleteStmt = "delete from model where id = ?"
+	updateStmt = "update model set name = ? where id = ?"
 
 	findByIDQuery = "select id, name from model where id = ? limit 1"
 	findAllQuery  = "select id, name from model limit ? offset ?"
@@ -85,4 +86,21 @@ func (d *DAO) FindByID(id int64) (*Model, error) {
 		return nil, fmt.Errorf("DAO#FindByID Scan: %v", err)
 	}
 	return &model, nil
+}
+
+func (d *DAO) Update(m *Model) (*Model, error) {
+	res, err := d.db.Exec(updateStmt, m.Name, m.ID)
+	if err != nil {
+		return nil, fmt.Errorf("DAO#Update Exec: %v", err)
+	}
+
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("DAO#Update RowsAffected: %v", err)
+	}
+	if affected < 1 {
+		return nil, nil
+	}
+
+	return m, nil
 }

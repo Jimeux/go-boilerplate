@@ -19,11 +19,19 @@ func main() {
 		log.Fatal(err)
 	}
 
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("recovered in main: ", r)
+		}
+		db.Close()
+	}()
+
 	dao := app.NewDAO(db)
 	controller := app.NewController(dao)
 
 	http.HandleFunc("/model/create", controller.Create)
 	http.HandleFunc("/model/destroy", controller.Destroy)
+	http.HandleFunc("/model/edit", controller.Edit)
 	http.HandleFunc("/model/index", controller.Index)
 	http.HandleFunc("/model/show", controller.Show)
 
