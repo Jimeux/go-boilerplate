@@ -55,14 +55,14 @@ curl -i -X "GET" "http://localhost:8080/model/show?id=2"
 
 ## ファイルの説明
 
-### `model.go`
+### `app/model.go`
 `model`テーブルの構造体（`Model`）を定義する
 
-### `dao.go`
+### `app/dao.go`
 `model`テーブルのCRUDを行う構造体（`DAO`）を定義する。[`sql.DB`](https://golang.org/pkg/database/sql/#DB)に依存する。
 
-### `controller.go`
-HTTPリクエスト／レスポンスに対応する構造体（`Controller`）を定義する。`DAO`に依存する。
+### `app/controller.go`
+HTTPリクエスト／レスポンスとロギングに対応する構造体（`Controller`）を定義する。`DAO`に依存する。
 
 ### `main.go`
 DBなどの初期化を行い、エンドポイントを定義しHTTPサーバを起動する。

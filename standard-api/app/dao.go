@@ -55,7 +55,7 @@ func (d *DAO) Delete(id int64) (bool, error) {
 }
 
 // FindAllは複数のModelを返却する。offset（開始位置）と
-// limit（行数）でページネーション行う。
+// limit（行数）でページネーションを行う。
 func (d *DAO) FindAll(offset, limit int) ([]Model, error) {
 	var models []Model
 
@@ -95,7 +95,7 @@ func (d *DAO) FindByID(id int64) (*Model, error) {
 	return &model, nil
 }
 
-// UpdateはmのDBレコードを更新する。
+// UpdateはmのDB上のレコードを更新する。
 // m.IDのModelが存在しない、または変更点がない場合はnilを返却する。
 func (d *DAO) Update(m *Model) (*Model, error) {
 	res, err := d.db.Exec(updateStmt, m.Name, m.ID)
