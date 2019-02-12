@@ -1,5 +1,9 @@
 # standard-api
-Go言語による簡単なAPIのサンプル。MySQLのドライバー以外は標準ライブラリにしか依存しません。
+### Go言語による簡単なAPIサーバのサンプルです
+MySQLのドライバー以外は**標準ライブラリにしか依存しません**。より簡潔なAPIを書くために以下のライブラリを検討してください。
+
+- ルーター／フレームワーク：[mux](https://github.com/gorilla/mux)、[Gin](https://github.com/gin-gonic/gin)
+- ORM：[Xorm](https://github.com/go-xorm/xorm)、[Gorm](https://github.com/jinzhu/gorm)
 
 ## セットアップ
 - [Docker & docker-compose](https://docs.docker.com/docker-for-mac/install/)
