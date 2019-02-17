@@ -1,5 +1,7 @@
 .idea
 .DS_Store
 
-standard-api/db/data
+main
+
+*/db/data
 standard-api/standard-api

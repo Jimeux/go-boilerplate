@@ -1,9 +1,7 @@
-# standard-api
-### Go言語による簡単なAPIサーバのサンプルです
-[MySQLのドライバー](https://github.com/go-sql-driver/mysql)以外は**標準ライブラリにしか依存しません**。より簡潔なAPIを書くために以下のライブラリを検討してください。
+# chi-gorm-api
 
-- ルーター：[gorilla/mux](https://github.com/gorilla/mux)、[chi](https://github.com/go-chi/chi)、[httprouter](https://github.com/julienschmidt/httprouter), [Gin](https://github.com/gin-gonic/gin)
-- ORM：[Xorm](https://github.com/go-xorm/xorm)、[Gorm](https://github.com/jinzhu/gorm)
+[MySQLのドライバー](https://github.com/go-sql-driver/mysql)
+
 
 ## セットアップ
 以下をインストールする。
@@ -26,29 +24,29 @@ GO111MODULE=on go run main.go
 
 ## APIのエンドポイント
 
-`POST /model/create`
+`POST /model`
 ```
-curl -i -X "POST" -H "Content-Type: application/json" -d '{"name":"My Name"}' "http://localhost:8080/model/create"
-```
-
-`DELETE /model/destroy?id={int}`
-```
-curl -i -X "DELETE" "http://localhost:8080/model/destroy?id=1"
+curl -i -X "POST" -H "Content-Type: application/json" -d '{"name":"My Name"}' "http://localhost:8080/v1/model"
 ```
 
-`PUT /model/edit`
+`DELETE /model/{id}`
 ```
-curl -i -X "PUT" -H "Content-Type: application/json" -d '{"id":1,"name":"Updated Name"}' "http://localhost:8080/model/edit"
-```
-
-`GET /model/index?page={int}&perPage={int}`
-```
-curl -i -X "GET" "http://localhost:8080/model/index?page=1&perPage=5"
+curl -i -X "DELETE" "http://localhost:8080/model/1"
 ```
 
-`GET /model/show?id={int}`
+`PUT /model/{id}`
 ```
-curl -i -X "GET" "http://localhost:8080/model/show?id=2"
+curl -i -X "PUT" -H "Content-Type: application/json" -d '{"id":1,"name":"Updated Name"}' "http://localhost:8080/model/1"
+```
+w
+`GET /model?page={int}&perPage={int}`
+```
+curl -i -X "GET" "http://localhost:8080/model?page=1&perPage=5"
+```
+
+`GET /model/{id}`
+```
+curl -i -X "GET" "http://localhost:8080/model/1"
 ```
 
 ＊ スラッシュの有無にご注意ください。

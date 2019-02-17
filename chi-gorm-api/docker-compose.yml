@@ -1,0 +1,15 @@
+version: '3.1'
+services:
+  db:
+    image: mysql:5.7.25 # https://hub.docker.com/_/mysql
+    restart: always
+    ports:
+      - 33306:3306
+    volumes:
+      - ./db/data:/var/lib/mysql # データ永続化用のディレクトリ
+      - ./db/init:/docker-entrypoint-initdb.d # 初期化用のSQLスクリプトのディレクトリ
+    environment:
+      MYSQL_DATABASE: chi_gorm_api
+      MYSQL_USER: dev
+      MYSQL_PASSWORD: pass
+      MYSQL_ROOT_PASSWORD: pass
