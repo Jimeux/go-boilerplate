@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -9,30 +10,32 @@ import (
 	"github.com/go-chi/chi"
 )
 
-type Controller struct {
-	dao DAO
+type RequestValidator interface {
+	Struct(s interface{}) error
 }
 
-func NewController(dao DAO) *Controller {
-	return &Controller{dao: dao}
+type Controller struct {
+	dao      DAO
+	validate RequestValidator
+}
+
+func NewController(dao DAO, validate RequestValidator) *Controller {
+	return &Controller{dao: dao, validate: validate}
 }
 
 func (c *Controller) Create(w http.ResponseWriter, r *http.Request) {
 	var m Model
-	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+	if err := c.decodeJSON(r.Body, &m); err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
-
-	model, err := c.dao.Create(&m)
-	if err != nil {
+	if _, err := c.dao.Create(&m); err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	writeJSON(&model, w)
+	writeJSON(&m, w)
 }
 
 func (c *Controller) Destroy(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +120,6 @@ func (c *Controller) Show(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
 	if model == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -125,9 +127,19 @@ func (c *Controller) Show(w http.ResponseWriter, r *http.Request) {
 	writeJSON(&model, w)
 }
 
+func (c *Controller) decodeJSON(body io.ReadCloser, strAdr interface{}) error {
+	if err := json.NewDecoder(body).Decode(strAdr); err != nil {
+		return err
+	}
+	if err := c.validate.Struct(strAdr); err != nil {
+		return err
+	}
+	return nil
+}
+
 // writeJSONはdataをJSONにエンコードしwに書き込む。
-func writeJSON(data interface{}, w http.ResponseWriter) {
-	body, err := json.Marshal(data)
+func writeJSON(strAdr interface{}, w http.ResponseWriter) {
+	body, err := json.Marshal(strAdr)
 	if err != nil {
 		log.Print(err)
 		w.WriteHeader(http.StatusInternalServerError)

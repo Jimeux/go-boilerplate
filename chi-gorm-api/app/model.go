@@ -1,13 +1,15 @@
 package app
 
 import (
-	"github.com/jinzhu/gorm"
+	"time"
 )
 
 type Model struct {
-	// ID   int64  `json:"id"`
-	gorm.Model
-	Name string `json:"name"`
+	ID        uint       `gorm:"primary_key" json:"id"`
+	Name      string     `json:"name" validate:"required"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"-"`
 }
 
 func (Model) TableName() string {

@@ -1,7 +1,9 @@
 # chi-gorm-api
 
-[MySQLのドライバー](https://github.com/go-sql-driver/mysql)
-
+- [go-chi](https://github.com/go-chi/chi)
+- [gorm](http://gorm.io)
+- [go-sql-driver/mysql](https://github.com/go-sql-driver/mysql)
+- [go-playground/validator](https://github.com/go-playground/validator)
 
 ## セットアップ
 以下をインストールする。
@@ -24,29 +26,29 @@ GO111MODULE=on go run main.go
 
 ## APIのエンドポイント
 
-`POST /model`
+`POST /v1/models`
 ```
-curl -i -X "POST" -H "Content-Type: application/json" -d '{"name":"My Name"}' "http://localhost:8080/v1/model"
-```
-
-`DELETE /model/{id}`
-```
-curl -i -X "DELETE" "http://localhost:8080/model/1"
+curl -i -X "POST" -H "Content-Type: application/json" "http://localhost:8080/v1/models" -d '{"name":"My Name"}'
 ```
 
-`PUT /model/{id}`
+`DELETE /v1/models/{id}`
 ```
-curl -i -X "PUT" -H "Content-Type: application/json" -d '{"id":1,"name":"Updated Name"}' "http://localhost:8080/model/1"
-```
-w
-`GET /model?page={int}&perPage={int}`
-```
-curl -i -X "GET" "http://localhost:8080/model?page=1&perPage=5"
+curl -i -X "DELETE" "http://localhost:8080/v1/models/1"
 ```
 
-`GET /model/{id}`
+`PUT /v1/models/{id}`
 ```
-curl -i -X "GET" "http://localhost:8080/model/1"
+curl -i -X "PUT" -H "Content-Type: application/json" -d '{"id":1,"name":"Updated Name"}' "http://localhost:8080/v1/models/1"
+```
+
+`GET /v1/models?page={int}&perPage={int}`
+```
+curl -i -X "GET" "http://localhost:8080/v1/models?page=1&perPage=5"
+```
+
+`GET /v1/models/{id}`
+```
+curl -i -X "GET" "http://localhost:8080/v1/models/1"
 ```
 
 ＊ スラッシュの有無にご注意ください。

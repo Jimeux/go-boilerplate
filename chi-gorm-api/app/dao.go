@@ -34,7 +34,7 @@ func (d *dao) Create(m *Model) (*Model, error) {
 
 // Deleteはidに指定されるエンティティを削除する。成功する場合はtrueを返却する。
 func (d *dao) Delete(id uint) (bool, error) {
-	row := Model{Model: gorm.Model{ID: id}}
+	row := Model{ID: id}
 	res := d.db.Delete(row)
 	if res.Error != nil {
 		return false, fmt.Errorf("dao#Delete Exec: %v", res.Error)
@@ -56,10 +56,13 @@ func (d *dao) FindAll(offset, limit int) ([]Model, error) {
 // FindByIDはIDに指定されたModelを返却する。
 // 存在しない場合はnilを返却する。
 func (d *dao) FindByID(id uint) (*Model, error) {
-	row := &Model{Model: gorm.Model{ID: id}}
+	row := &Model{ID: id}
 	res := d.db.First(row)
+	if res.Error != nil && res.Error == gorm.ErrRecordNotFound {
+		return nil, nil // TODO 2019-02-19 @Jimeux NotFound error type
+	}
 	if res.Error != nil {
-		return nil, fmt.Errorf("dao#FindByID Scan: %v", res.Error)
+		return nil, fmt.Errorf("dao#FindByID: %v", res.Error)
 	}
 	return row, nil
 }

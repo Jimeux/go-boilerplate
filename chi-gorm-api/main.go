@@ -1,6 +1,7 @@
 package main
 
 import (
+	"gopkg.in/go-playground/validator.v9"
 	"log"
 	"net/http"
 
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	dbURL = "dev:pass@tcp(localhost:33306)/chi_gorm_api"
+	dbURL = "dev:pass@tcp(localhost:33306)/chi_gorm_api?parseTime=true"
 )
 
 func main() {
@@ -21,6 +22,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	db.LogMode(true)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -30,7 +32,9 @@ func main() {
 	}()
 
 	dao := app.NewDAO(db)
-	controller := app.NewController(dao)
+
+	validate := validator.New()
+	controller := app.NewController(dao, validate)
 
 	router := chi.NewRouter()
 
@@ -44,14 +48,16 @@ func main() {
 		render.SetContentType(render.ContentTypeJSON),
 	)
 
-	router.Route("/model", func(r chi.Router) {
-		r.Get("/", controller.Index)
-		r.Post("/", controller.Create)
+	router.Route("/v1", func(v1 chi.Router) {
+		v1.Route("/models", func(models chi.Router) {
+			models.Post("/", controller.Create)
+			models.Get("/", controller.Index)
 
-		r.Route("/{id}", func(r chi.Router) {
-			r.Get("/", controller.Show)
-			r.Put("/", controller.Edit)
-			r.Delete("/", controller.Destroy)
+			models.Route("/{id}", func(r chi.Router) {
+				r.Get("/", controller.Show)
+				r.Put("/", controller.Edit)
+				r.Delete("/", controller.Destroy)
+			})
 		})
 	})
 
