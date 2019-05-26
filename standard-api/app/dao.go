@@ -2,7 +2,6 @@ package app
 
 import (
 	"database/sql"
-	"fmt"
 
 	"golang.org/x/xerrors"
 )
@@ -34,7 +33,7 @@ func (d *DAO) Create(m *Model) (*Model, error) {
 
 	res, err := d.db.Exec(createStmt, m.Name, m.Nonce)
 	if err != nil {
-		return nil, xerrors.Errorf("error at Exec: %w", err)
+		return nil, xerrors.Errorf("error at exec: %w", err)
 	}
 
 	lastID, err := res.LastInsertId()
@@ -53,12 +52,12 @@ func (d *DAO) Create(m *Model) (*Model, error) {
 func (d *DAO) Delete(id int64) (bool, error) {
 	res, err := d.db.Exec(deleteStmt, id)
 	if err != nil {
-		return false, fmt.Errorf("error at Exec: %v", err)
+		return false, xerrors.Errorf("error at Exec: %w", err)
 	}
 
 	affected, err := res.RowsAffected()
 	if err != nil {
-		return false, fmt.Errorf("error at RowsAffected: %v", err)
+		return false, xerrors.Errorf("error at RowsAffected: %w", err)
 	}
 
 	return affected > 0, nil
@@ -71,14 +70,14 @@ func (d *DAO) FindAll(offset, limit int) ([]Model, error) {
 
 	rows, err := d.db.Query(findAllQuery, limit, offset)
 	if err != nil {
-		return nil, xerrors.Errorf("query error: %w", err)
+		return nil, xerrors.Errorf("error at Query: %w", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var m Model
 		if err := rows.Scan(&m.ID, &m.Name, &m.Nonce); err != nil {
-			return nil, xerrors.Errorf("rows.Scan error: %w", err)
+			return nil, xerrors.Errorf("error at rows.Scan: %w", err)
 		}
 
 		// 復号化
@@ -107,7 +106,7 @@ func (d *DAO) FindByID(id int64) (*Model, error) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("error at Scan: %v", err)
+		return nil, xerrors.Errorf("error at Scan: %w", err)
 	}
 
 	// 復号化
@@ -128,12 +127,12 @@ func (d *DAO) Update(m *Model) (*Model, error) {
 
 	res, err := d.db.Exec(updateStmt, m.Name, m.Nonce, m.ID)
 	if err != nil {
-		return nil, fmt.Errorf("error at Exec: %v", err)
+		return nil, xerrors.Errorf("error at Exec: %w", err)
 	}
 
 	affected, err := res.RowsAffected()
 	if err != nil {
-		return nil, fmt.Errorf("error at RowsAffected: %v", err)
+		return nil, xerrors.Errorf("error at RowsAffected: %w", err)
 	}
 	if affected < 1 {
 		return nil, nil
