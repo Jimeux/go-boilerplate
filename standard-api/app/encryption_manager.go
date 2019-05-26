@@ -9,34 +9,10 @@ import (
 	"golang.org/x/xerrors"
 )
 
-var (
-	tagName = "encrypt"
+const (
+	tagName  = "encrypt"
+	tagValue = "true"
 )
-
-type EncryptableFields interface {
-	GetNonce() string
-	SetNonce(nonce string)
-	IsEncrypted() bool
-	SetEncrypted(b bool)
-}
-
-type Encryptable struct {
-	Nonce     string `json:"-"`
-	Encrypted bool   `json:"-"`
-}
-
-func (e *Encryptable) GetNonce() string {
-	return e.Nonce
-}
-func (e *Encryptable) SetNonce(nonce string) {
-	e.Nonce = nonce
-}
-func (e *Encryptable) IsEncrypted() bool {
-	return e.Encrypted
-}
-func (e *Encryptable) SetEncrypted(b bool) {
-	e.Encrypted = b
-}
 
 type EncryptionManager struct {
 	aead cipher.AEAD
@@ -46,28 +22,33 @@ func NewEncryptionManager(aead cipher.AEAD) *EncryptionManager {
 	return &EncryptionManager{aead: aead}
 }
 
-// FIXME 2019-05-26 @Jimeux 適当なリフレクション
+// Encrypt encrypts all fields in ef marked with the encrypt tag.
+// ef must be a pointer to a struct with at least one tagged field.
 func (m *EncryptionManager) Encrypt(ef EncryptableFields) error {
+	t, v, err := m.getTypeAndValue(ef)
+	if err != nil {
+		return xerrors.Errorf("failed to parse encrypt input: %w", err)
+	}
+
 	if ef.IsEncrypted() {
-		return xerrors.New("trying to re-encrypt encrypted struct")
+		return xerrors.New("cannot re-encrypt encrypted struct")
 	}
 
-	t := reflect.TypeOf(ef)
-	v := reflect.ValueOf(ef)
-	if v.Kind() == reflect.Ptr {
-		v = reflect.Indirect(v)
+	fields, err := m.getTaggedFieldNames(v, t)
+	if err != nil {
+		return xerrors.Errorf("failed to get field names for encryption: %w", err)
 	}
 
-	nonce := string(generateNonce())
+	nonce, err := generateNonce()
+	if err != nil {
+		return err
+	}
 
-	for i := 0; i < v.NumField(); i++ {
-		field := t.Elem().Field(i)
-		tag := field.Tag.Get(tagName)
+	for _, field := range fields {
+		f := v.FieldByName(field)
 
-		if tag == "true" {
-			ciph := m.encrypt(v.Field(i).String(), nonce)
-			v.Field(i).SetString(ciph)
-		}
+		cipherText := m.encrypt(f.String(), nonce)
+		f.SetString(cipherText)
 	}
 
 	ef.SetEncrypted(true)
@@ -75,60 +56,102 @@ func (m *EncryptionManager) Encrypt(ef EncryptableFields) error {
 	return nil
 }
 
-// FIXME 2019-05-26 @Jimeux 適当なリフレクション
+// Decrypt decrypts all fields in ef marked with the encrypt tag.
+// ef must be a pointer to a struct with at least one tagged field.
 func (m *EncryptionManager) Decrypt(ef EncryptableFields) error {
+	t, v, err := m.getTypeAndValue(ef)
+	if err != nil {
+		return xerrors.Errorf("failed to parse decrypt input: %w", err)
+	}
+
 	if !ef.IsEncrypted() {
 		return xerrors.New("trying to decrypt unencrypted struct")
 	}
 
-	t := reflect.TypeOf(ef)
-	v := reflect.ValueOf(ef)
-	if v.Kind() == reflect.Ptr {
-		v = reflect.Indirect(v)
+	fields, err := m.getTaggedFieldNames(v, t)
+	if err != nil {
+		return xerrors.Errorf("failed to get field names for decryption: %w", err)
 	}
 
-	for i := 0; i < v.NumField(); i++ {
-		field := t.Elem().Field(i)
-		tag := field.Tag.Get(tagName)
+	for _, field := range fields {
+		f := v.FieldByName(field)
 
-		if tag == "true" {
-			plain, err := m.decrypt(v.Field(i).String(), ef.GetNonce())
-			if err != nil {
-				return err
-			}
-			v.Field(i).SetString(plain)
+		plainText, err := m.decrypt(f.String(), ef.GetNonce())
+		if err != nil {
+			return err
 		}
+		f.SetString(plainText)
 	}
 
 	ef.SetEncrypted(false)
 	return nil
 }
 
+func (m *EncryptionManager) getTypeAndValue(ef EncryptableFields) (reflect.Type, *reflect.Value, error) {
+	t := reflect.TypeOf(ef)
+	v := reflect.ValueOf(ef)
+
+	if ef == nil {
+		return nil, nil, xerrors.New("value is nil")
+	}
+	if v.Kind() != reflect.Ptr {
+		return nil, nil, xerrors.New("value is not a pointer")
+	}
+	if reflect.ValueOf(ef).IsNil() {
+		return nil, nil, xerrors.New("value is a nil pointer")
+	}
+
+	v = reflect.Indirect(v)
+	return t, &v, nil
+}
+
+// getTaggedFieldNames returns field names from struct v that are
+// marked with encrypt=true meta tag.
+func (m *EncryptionManager) getTaggedFieldNames(v *reflect.Value, t reflect.Type) ([]string, error) {
+	if v.Kind() != reflect.Struct {
+		return nil, xerrors.New("cannot encrypt non-struct value")
+	}
+
+	var fields []string
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Elem().Field(i)
+		tag := field.Tag.Get(tagName)
+
+		if tag == tagValue {
+			if field.Type.Kind() != reflect.String {
+				return nil, xerrors.New("encrypt fields must be of type string")
+			}
+			fields = append(fields, field.Name)
+		}
+	}
+
+	if len(fields) == 0 {
+		return nil, xerrors.New("struct has no encryptable fields marked with encrypt tag")
+	}
+	return fields, nil
+}
+
 func (m *EncryptionManager) encrypt(val, nonce string) string {
-	ciphertext := m.aead.Seal(nil, []byte(nonce), []byte(val), nil)
-	return string(ciphertext)
+	cipherText := m.aead.Seal(nil, []byte(nonce), []byte(val), nil)
+	return string(cipherText)
 }
 
 func (m *EncryptionManager) decrypt(val, nonce string) (string, error) {
-	if err := validateNonce(nonce); err != nil {
-		return "", err
-	}
-	plaintext, err := m.aead.Open(nil, []byte(nonce), []byte(val), nil)
-	if err != nil {
-		return "", xerrors.Errorf("failed to decrypt or authenticate message: %w", err)
-	}
-	return string(plaintext), nil
-}
-
-func validateNonce(nonce string) error {
 	if nonce == "" || len([]byte(nonce)) != chacha20poly1305.NonceSizeX {
-		return xerrors.New("invalid nonce")
+		return "", xerrors.New("invalid nonce")
 	}
-	return nil
+
+	plainText, err := m.aead.Open(nil, []byte(nonce), []byte(val), nil)
+	if err != nil {
+		return "", xerrors.Errorf("failed to decrypt or authenticate value: %w", err)
+	}
+	return string(plainText), nil
 }
 
-func generateNonce() []byte {
+func generateNonce() (string, error) {
 	nonce := make([]byte, chacha20poly1305.NonceSizeX)
-	_, _ = rand.Read(nonce) // TODO 2019-05-26 @Jimeux error handling
-	return nonce
+	if _, err := rand.Read(nonce); err != nil {
+		return "", xerrors.Errorf("error generating nonce: %w")
+	}
+	return string(nonce), nil
 }
