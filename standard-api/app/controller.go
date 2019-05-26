@@ -2,7 +2,7 @@ package app
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
 	"net/http"
 	"strconv"
 )
@@ -22,14 +22,14 @@ func (c *Controller) Create(w http.ResponseWriter, r *http.Request) {
 
 	var m Model
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
-		log.Print(err)
+		fmt.Printf("%+v\n", err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
 	model, err := c.dao.Create(&m)
 	if err != nil {
-		log.Print(err)
+		fmt.Printf("%+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -45,14 +45,14 @@ func (c *Controller) Destroy(w http.ResponseWriter, r *http.Request) {
 	idParam := r.URL.Query().Get("id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
-		log.Print(err)
+		fmt.Printf("%+v\n", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	exists, err := c.dao.Delete(id)
 	if err != nil {
-		log.Print(err)
+		fmt.Printf("%+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -71,14 +71,14 @@ func (c *Controller) Edit(w http.ResponseWriter, r *http.Request) {
 
 	var m Model
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
-		log.Print(err)
+		fmt.Printf("%+v\n", err)
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
 
 	updated, err := c.dao.Update(&m)
 	if err != nil {
-		log.Print(err)
+		fmt.Printf("%+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -108,7 +108,7 @@ func (c *Controller) Index(w http.ResponseWriter, r *http.Request) {
 
 	models, err := c.dao.FindAll(page*perPage-perPage, perPage)
 	if err != nil {
-		log.Print(err)
+		fmt.Printf("%+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -124,14 +124,14 @@ func (c *Controller) Show(w http.ResponseWriter, r *http.Request) {
 	idParam := r.URL.Query().Get("id")
 	id, err := strconv.ParseInt(idParam, 10, 64)
 	if err != nil {
-		log.Print(err)
+		fmt.Printf("%+v\n", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	model, err := c.dao.FindByID(id)
 	if err != nil {
-		log.Print(err)
+		fmt.Printf("%+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -147,13 +147,13 @@ func (c *Controller) Show(w http.ResponseWriter, r *http.Request) {
 func writeJSON(data interface{}, w http.ResponseWriter) {
 	body, err := json.Marshal(data)
 	if err != nil {
-		log.Print(err)
+		fmt.Printf("%+v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if _, err := w.Write(body); err != nil {
-		log.Print(err)
+		fmt.Printf("%+v\n", err)
 	}
 }
