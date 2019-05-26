@@ -2,7 +2,8 @@ package app
 
 import (
 	"database/sql"
-	"fmt"
+
+	"golang.org/x/xerrors"
 )
 
 const (
@@ -27,12 +28,12 @@ func NewDAO(db *sql.DB) *DAO {
 func (d *DAO) Create(m *Model) (*Model, error) {
 	res, err := d.db.Exec(createStmt, m.Name)
 	if err != nil {
-		return nil, fmt.Errorf("DAO#Create exec: %v", err)
+		return nil, xerrors.Errorf("error at exec: %w", err)
 	}
 
 	lastID, err := res.LastInsertId()
 	if err != nil {
-		return nil, fmt.Errorf("DAO#Create LastInsertId: %v", err)
+		return nil, xerrors.Errorf("error at LastInsertId: %w", err)
 	}
 
 	m.ID = lastID
@@ -43,12 +44,12 @@ func (d *DAO) Create(m *Model) (*Model, error) {
 func (d *DAO) Delete(id int64) (bool, error) {
 	res, err := d.db.Exec(deleteStmt, id)
 	if err != nil {
-		return false, fmt.Errorf("DAO#Delete Exec: %v", err)
+		return false, xerrors.Errorf("error at Exec: %w", err)
 	}
 
 	affected, err := res.RowsAffected()
 	if err != nil {
-		return false, fmt.Errorf("DAO#Delete RowsAffected: %v", err)
+		return false, xerrors.Errorf("error at RowsAffected: %w", err)
 	}
 
 	return affected > 0, nil
@@ -61,19 +62,19 @@ func (d *DAO) FindAll(offset, limit int) ([]Model, error) {
 
 	rows, err := d.db.Query(findAllQuery, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("DAO#FindAll Query: %v", err)
+		return nil, xerrors.Errorf("error at Query: %w", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var m Model
 		if err := rows.Scan(&m.ID, &m.Name); err != nil {
-			return nil, fmt.Errorf("DAO#FindAll rows.Scan: %v", err)
+			return nil, xerrors.Errorf("error at rows.Scan: %w", err)
 		}
 		models = append(models, m)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("DAO#FindAll rows iteration: %v", err)
+		return nil, xerrors.Errorf("row iteration error: %v", err)
 	}
 
 	return models, nil
@@ -90,7 +91,7 @@ func (d *DAO) FindByID(id int64) (*Model, error) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("DAO#FindByID Scan: %v", err)
+		return nil, xerrors.Errorf("error at Scan: %w", err)
 	}
 	return &model, nil
 }
@@ -100,12 +101,12 @@ func (d *DAO) FindByID(id int64) (*Model, error) {
 func (d *DAO) Update(m *Model) (*Model, error) {
 	res, err := d.db.Exec(updateStmt, m.Name, m.ID)
 	if err != nil {
-		return nil, fmt.Errorf("DAO#Update Exec: %v", err)
+		return nil, xerrors.Errorf("error at Exec: %w", err)
 	}
 
 	affected, err := res.RowsAffected()
 	if err != nil {
-		return nil, fmt.Errorf("DAO#Update RowsAffected: %v", err)
+		return nil, xerrors.Errorf("error at RowsAffected: %w", err)
 	}
 	if affected < 1 {
 		return nil, nil
