@@ -106,8 +106,12 @@ func (m *EncryptionManager) Decrypt(ef EncryptableFields) error {
 		if err != nil {
 			return xerrors.Errorf("failed to get keyVersion: %w", err)
 		}
+		aead, ok := m.aeadMap[keyVersion]
+		if !ok {
+			return xerrors.Errorf("unknown keyVersion %d during decryption", keyVersion)
+		}
 
-		plainText, err := m.aeadMap[keyVersion].Open(nil, []byte(ef.GetNonce()), val, nil)
+		plainText, err := aead.Open(nil, []byte(ef.GetNonce()), val, nil)
 		if err != nil {
 			return xerrors.Errorf("failed to decrypt or authenticate value: %w", err)
 		}
