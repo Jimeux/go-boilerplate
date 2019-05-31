@@ -7,7 +7,6 @@ import (
 
 	"github.com/Jimeux/go-boilerplate/standard-api/app"
 	_ "github.com/go-sql-driver/mysql"
-	"golang.org/x/crypto/chacha20poly1305"
 )
 
 const (
@@ -27,13 +26,15 @@ func main() {
 		db.Close()
 	}()
 
-	key := []byte("itWouldBeBadIfSomebodyFoundThis!")
-	aead, err := chacha20poly1305.NewX(key)
-	if err != nil {
-		log.Fatalln("Failed to instantiate XChaCha20-Poly1305:", err)
+	currentVersion := app.Version(1)
+	keyMap := app.KeyMap{
+		1: []byte("itWouldBeBadIfSomebodyFoundThis!"),
+		2: []byte("itWouldBeBadIfSomeoneFoundThis!!"),
 	}
-
-	encryptionManager := app.NewEncryptionManager(aead)
+	encryptionManager, err := app.NewEncryptionManager(currentVersion, keyMap)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	dao := app.NewDAO(db, encryptionManager)
 	controller := app.NewController(dao)
 

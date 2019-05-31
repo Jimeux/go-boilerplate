@@ -14,18 +14,41 @@ const (
 	tagValue = "true"
 )
 
+type (
+	Version byte
+	Key     []byte
+	KeyMap  map[Version]Key
+	aeadMap map[Version]cipher.AEAD
+)
+
 type EncryptionManager struct {
-	aead cipher.AEAD
+	aeadMap aeadMap
+	version Version
 }
 
-func NewEncryptionManager(aead cipher.AEAD) *EncryptionManager {
-	return &EncryptionManager{aead: aead}
+func NewEncryptionManager(version Version, keyMap KeyMap) (*EncryptionManager, error) {
+	if _, ok := keyMap[version]; !ok {
+		return nil, xerrors.Errorf("key not provided for version %d", version)
+	}
+
+	aeadMap := make(aeadMap)
+	for version, key := range keyMap {
+		aead, err := chacha20poly1305.NewX(key)
+		if err != nil {
+			return nil, xerrors.Errorf("Failed to instantiate XChaCha20-Poly1305 with given key: %w", err)
+		}
+		aeadMap[version] = aead
+	}
+	return &EncryptionManager{
+		aeadMap: aeadMap,
+		version: version,
+	}, nil
 }
 
 // Encrypt encrypts all fields in ef marked with the encrypt tag.
 // ef must be a pointer to a struct with at least one tagged field.
 func (m *EncryptionManager) Encrypt(ef EncryptableFields) error {
-	t, v, err := m.getTypeAndValue(ef)
+	t, v, err := getTypeAndValue(ef)
 	if err != nil {
 		return xerrors.Errorf("failed to parse encrypt input: %w", err)
 	}
@@ -34,7 +57,7 @@ func (m *EncryptionManager) Encrypt(ef EncryptableFields) error {
 		return xerrors.New("cannot re-encrypt encrypted struct")
 	}
 
-	fields, err := m.getTaggedFieldNames(v, t)
+	fields, err := getTaggedFieldNames(v, t)
 	if err != nil {
 		return xerrors.Errorf("failed to get field names for encryption: %w", err)
 	}
@@ -47,28 +70,31 @@ func (m *EncryptionManager) Encrypt(ef EncryptableFields) error {
 	for _, field := range fields {
 		f := v.FieldByName(field)
 
-		cipherText := m.encrypt(f.String(), nonce)
-		f.SetString(cipherText)
+		cipherText := m.aeadMap[m.version].Seal(nil, nonce, []byte(f.String()), nil)
+		val := setKeyVersion(m.version, cipherText)
+		f.SetString(string(val))
 	}
 
 	ef.SetEncrypted(true)
-	ef.SetNonce(nonce)
+	ef.SetNonce(string(nonce))
 	return nil
 }
 
 // Decrypt decrypts all fields in ef marked with the encrypt tag.
 // ef must be a pointer to a struct with at least one tagged field.
 func (m *EncryptionManager) Decrypt(ef EncryptableFields) error {
-	t, v, err := m.getTypeAndValue(ef)
+	t, v, err := getTypeAndValue(ef)
 	if err != nil {
 		return xerrors.Errorf("failed to parse decrypt input: %w", err)
 	}
-
 	if !ef.IsEncrypted() {
 		return xerrors.New("trying to decrypt unencrypted struct")
 	}
+	if err := validateNonce([]byte(ef.GetNonce())); err != nil {
+		return xerrors.Errorf("invalid nonce during decryption: %w", err)
+	}
 
-	fields, err := m.getTaggedFieldNames(v, t)
+	fields, err := getTaggedFieldNames(v, t)
 	if err != nil {
 		return xerrors.Errorf("failed to get field names for decryption: %w", err)
 	}
@@ -76,18 +102,23 @@ func (m *EncryptionManager) Decrypt(ef EncryptableFields) error {
 	for _, field := range fields {
 		f := v.FieldByName(field)
 
-		plainText, err := m.decrypt(f.String(), ef.GetNonce())
+		keyVersion, val, err := getKeyVersion([]byte(f.String()))
 		if err != nil {
-			return err
+			return xerrors.Errorf("failed to get keyVersion: %w", err)
 		}
-		f.SetString(plainText)
+
+		plainText, err := m.aeadMap[keyVersion].Open(nil, []byte(ef.GetNonce()), val, nil)
+		if err != nil {
+			return xerrors.Errorf("failed to decrypt or authenticate value: %w", err)
+		}
+		f.SetString(string(plainText))
 	}
 
 	ef.SetEncrypted(false)
 	return nil
 }
 
-func (m *EncryptionManager) getTypeAndValue(ef EncryptableFields) (reflect.Type, *reflect.Value, error) {
+func getTypeAndValue(ef EncryptableFields) (reflect.Type, *reflect.Value, error) {
 	t := reflect.TypeOf(ef)
 	v := reflect.ValueOf(ef)
 
@@ -107,7 +138,7 @@ func (m *EncryptionManager) getTypeAndValue(ef EncryptableFields) (reflect.Type,
 
 // getTaggedFieldNames returns field names from struct v that are
 // marked with encrypt=true meta tag.
-func (m *EncryptionManager) getTaggedFieldNames(v *reflect.Value, t reflect.Type) ([]string, error) {
+func getTaggedFieldNames(v *reflect.Value, t reflect.Type) ([]string, error) {
 	if v.Kind() != reflect.Struct {
 		return nil, xerrors.New("cannot encrypt non-struct value")
 	}
@@ -131,27 +162,30 @@ func (m *EncryptionManager) getTaggedFieldNames(v *reflect.Value, t reflect.Type
 	return fields, nil
 }
 
-func (m *EncryptionManager) encrypt(val, nonce string) string {
-	cipherText := m.aead.Seal(nil, []byte(nonce), []byte(val), nil)
-	return string(cipherText)
+func getKeyVersion(b []byte) (Version, []byte, error) {
+	if len(b) < 1 {
+		return 0, nil, xerrors.New("invalid byte array")
+	}
+	return Version(b[0]), b[1:], nil
 }
 
-func (m *EncryptionManager) decrypt(val, nonce string) (string, error) {
-	if nonce == "" || len([]byte(nonce)) != chacha20poly1305.NonceSizeX {
-		return "", xerrors.New("invalid nonce")
-	}
-
-	plainText, err := m.aead.Open(nil, []byte(nonce), []byte(val), nil)
-	if err != nil {
-		return "", xerrors.Errorf("failed to decrypt or authenticate value: %w", err)
-	}
-	return string(plainText), nil
+// setKeyVersion stores the keyVersion in the first byte of
+// the value to be encrypted
+func setKeyVersion(keyVersion Version, val []byte) []byte {
+	return append([]byte{byte(keyVersion)}, val...)
 }
 
-func generateNonce() (string, error) {
+func generateNonce() ([]byte, error) {
 	nonce := make([]byte, chacha20poly1305.NonceSizeX)
 	if _, err := rand.Read(nonce); err != nil {
-		return "", xerrors.Errorf("error generating nonce: %w")
+		return nil, xerrors.Errorf("error generating nonce: %w")
 	}
-	return string(nonce), nil
+	return nonce, nil
+}
+
+func validateNonce(nonce []byte) error {
+	if nonce == nil || len(nonce) != chacha20poly1305.NonceSizeX {
+		return xerrors.New("invalid nonce")
+	}
+	return nil
 }
