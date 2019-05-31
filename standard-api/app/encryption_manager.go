@@ -62,21 +62,19 @@ func (m *EncryptionManager) Encrypt(ef EncryptableFields) error {
 		return xerrors.Errorf("failed to get field names for encryption: %w", err)
 	}
 
-	nonce, err := generateNonce()
-	if err != nil {
-		return err
-	}
-
 	for _, field := range fields {
 		f := v.FieldByName(field)
 
+		nonce, err := generateNonce()
+		if err != nil {
+			return xerrors.Errorf("nonce generation error: %w", err)
+		}
 		cipherText := m.aeadMap[m.version].Seal(nil, nonce, []byte(f.String()), nil)
-		val := setKeyVersion(m.version, cipherText)
+		val := setParts(m.version, nonce, cipherText)
 		f.SetString(string(val))
 	}
 
 	ef.SetEncrypted(true)
-	ef.SetNonce(string(nonce))
 	return nil
 }
 
@@ -90,9 +88,6 @@ func (m *EncryptionManager) Decrypt(ef EncryptableFields) error {
 	if !ef.IsEncrypted() {
 		return xerrors.New("trying to decrypt unencrypted struct")
 	}
-	if err := validateNonce([]byte(ef.GetNonce())); err != nil {
-		return xerrors.Errorf("invalid nonce during decryption: %w", err)
-	}
 
 	fields, err := getTaggedFieldNames(v, t)
 	if err != nil {
@@ -102,7 +97,7 @@ func (m *EncryptionManager) Decrypt(ef EncryptableFields) error {
 	for _, field := range fields {
 		f := v.FieldByName(field)
 
-		keyVersion, val, err := getKeyVersion([]byte(f.String()))
+		keyVersion, nonce, val, err := getParts([]byte(f.String()))
 		if err != nil {
 			return xerrors.Errorf("failed to get keyVersion: %w", err)
 		}
@@ -111,7 +106,7 @@ func (m *EncryptionManager) Decrypt(ef EncryptableFields) error {
 			return xerrors.Errorf("unknown keyVersion %d during decryption", keyVersion)
 		}
 
-		plainText, err := aead.Open(nil, []byte(ef.GetNonce()), val, nil)
+		plainText, err := aead.Open(nil, nonce, val, nil)
 		if err != nil {
 			return xerrors.Errorf("failed to decrypt or authenticate value: %w", err)
 		}
@@ -166,17 +161,18 @@ func getTaggedFieldNames(v *reflect.Value, t reflect.Type) ([]string, error) {
 	return fields, nil
 }
 
-func getKeyVersion(b []byte) (Version, []byte, error) {
-	if len(b) < 1 {
-		return 0, nil, xerrors.New("invalid byte array")
+func getParts(b []byte) (Version, []byte, []byte, error) {
+	if len(b) < 25 {
+		return 0, nil, nil, xerrors.New("invalid byte array")
 	}
-	return Version(b[0]), b[1:], nil
+	if err := validateNonce(b[1:25]); err != nil {
+		return 0, nil, nil, xerrors.Errorf("invalid nonce during decryption: %w", err)
+	}
+	return Version(b[0]), b[1:25], b[25:], nil
 }
 
-// setKeyVersion stores the keyVersion in the first byte of
-// the value to be encrypted
-func setKeyVersion(keyVersion Version, val []byte) []byte {
-	return append([]byte{byte(keyVersion)}, val...)
+func setParts(keyVersion Version, nonce, val []byte) []byte {
+	return append(append([]byte{byte(keyVersion)}, nonce...), val...)
 }
 
 func generateNonce() ([]byte, error) {

@@ -7,12 +7,12 @@ import (
 )
 
 const (
-	createStmt = "insert into model (name, nonce) values (?, ?)"
+	createStmt = "insert into model (name) values (?)"
 	deleteStmt = "delete from model where id = ?"
-	updateStmt = "update model set name = ?, nonce = ? where id = ?"
+	updateStmt = "update model set name = ? where id = ?"
 
-	findByIDQuery = "select id, name, nonce from model where id = ? limit 1"
-	findAllQuery  = "select id, name, nonce from model limit ? offset ?"
+	findByIDQuery = "select id, name from model where id = ? limit 1"
+	findAllQuery  = "select id, name from model limit ? offset ?"
 )
 
 type DAO struct {
@@ -31,7 +31,7 @@ func (d *DAO) Create(m *Model) (*Model, error) {
 		return nil, xerrors.Errorf("could not encrypt pre-create: %w", err)
 	}
 
-	res, err := d.db.Exec(createStmt, m.Name, m.Nonce)
+	res, err := d.db.Exec(createStmt, m.Name)
 	if err != nil {
 		return nil, xerrors.Errorf("error at exec: %w", err)
 	}
@@ -76,7 +76,7 @@ func (d *DAO) FindAll(offset, limit int) ([]Model, error) {
 
 	for rows.Next() {
 		var m Model
-		if err := rows.Scan(&m.ID, &m.Name, &m.Nonce); err != nil {
+		if err := rows.Scan(&m.ID, &m.Name); err != nil {
 			return nil, xerrors.Errorf("error at rows.Scan: %w", err)
 		}
 
@@ -101,7 +101,7 @@ func (d *DAO) FindByID(id int64) (*Model, error) {
 	var model Model
 
 	row := d.db.QueryRow(findByIDQuery, id)
-	err := row.Scan(&model.ID, &model.Name, &model.Nonce)
+	err := row.Scan(&model.ID, &model.Name)
 	if err != nil && err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -125,7 +125,7 @@ func (d *DAO) Update(m *Model) (*Model, error) {
 		return nil, xerrors.Errorf("could not encrypt pre-update: %w", err)
 	}
 
-	res, err := d.db.Exec(updateStmt, m.Name, m.Nonce, m.ID)
+	res, err := d.db.Exec(updateStmt, m.Name, m.ID)
 	if err != nil {
 		return nil, xerrors.Errorf("error at Exec: %w", err)
 	}

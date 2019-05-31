@@ -1,8 +1,7 @@
 create table if not exists model
 (
     id    int auto_increment primary key,
-    name  varbinary(255) not null,
-    nonce varbinary(24)  not null
+    name  varbinary(255) not null
 );
 
 insert into model (name)
