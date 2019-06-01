@@ -81,7 +81,6 @@ func (d *DAO) FindAll(offset, limit int) ([]Model, error) {
 		}
 
 		// 復号化
-		m.SetEncrypted(true)
 		if err := d.encryption.Decrypt(&m); err != nil {
 			return nil, xerrors.Errorf("row decryption error: %w", err)
 		}
@@ -110,7 +109,6 @@ func (d *DAO) FindByID(id int64) (*Model, error) {
 	}
 
 	// 復号化
-	model.SetEncrypted(true)
 	if err := d.encryption.Decrypt(&model); err != nil {
 		return nil, err
 	}

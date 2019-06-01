@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"crypto/cipher"
 	"crypto/rand"
 	"reflect"
@@ -12,6 +13,11 @@ import (
 const (
 	tagName  = "encrypt"
 	tagValue = "true"
+)
+
+var (
+	magicBytes    = []byte{0xBE, 0xEF}
+	magicBytesLen = len(magicBytes)
 )
 
 type (
@@ -47,14 +53,10 @@ func NewEncryptionManager(version Version, keyMap KeyMap) (*EncryptionManager, e
 
 // Encrypt encrypts all fields in ef marked with the encrypt tag.
 // ef must be a pointer to a struct with at least one tagged field.
-func (m *EncryptionManager) Encrypt(ef EncryptableFields) error {
-	t, v, err := getTypeAndValue(ef)
+func (m *EncryptionManager) Encrypt(i interface{}) error {
+	t, v, err := getReflectedTypeAndValue(i)
 	if err != nil {
 		return xerrors.Errorf("failed to parse encrypt input: %w", err)
-	}
-
-	if ef.IsEncrypted() {
-		return xerrors.New("cannot re-encrypt encrypted struct")
 	}
 
 	fields, err := getTaggedFieldNames(v, t)
@@ -64,29 +66,28 @@ func (m *EncryptionManager) Encrypt(ef EncryptableFields) error {
 
 	for _, field := range fields {
 		f := v.FieldByName(field)
+		val := []byte(f.String())
+		if isEncrypted(val) {
+			return xerrors.New("cannot re-encrypt encrypted value")
+		}
 
 		nonce, err := generateNonce()
 		if err != nil {
 			return xerrors.Errorf("nonce generation error: %w", err)
 		}
-		cipherText := m.aeadMap[m.version].Seal(nil, nonce, []byte(f.String()), nil)
-		val := setParts(m.version, nonce, cipherText)
-		f.SetString(string(val))
+		cipherText := m.aeadMap[m.version].Seal(nil, nonce, val, nil)
+		encVal := setParts(m.version, nonce, cipherText)
+		f.SetString(string(encVal))
 	}
-
-	ef.SetEncrypted(true)
 	return nil
 }
 
 // Decrypt decrypts all fields in ef marked with the encrypt tag.
 // ef must be a pointer to a struct with at least one tagged field.
-func (m *EncryptionManager) Decrypt(ef EncryptableFields) error {
-	t, v, err := getTypeAndValue(ef)
+func (m *EncryptionManager) Decrypt(i interface{}) error {
+	t, v, err := getReflectedTypeAndValue(i)
 	if err != nil {
 		return xerrors.Errorf("failed to parse decrypt input: %w", err)
-	}
-	if !ef.IsEncrypted() {
-		return xerrors.New("trying to decrypt unencrypted struct")
 	}
 
 	fields, err := getTaggedFieldNames(v, t)
@@ -96,11 +97,16 @@ func (m *EncryptionManager) Decrypt(ef EncryptableFields) error {
 
 	for _, field := range fields {
 		f := v.FieldByName(field)
-
-		keyVersion, nonce, val, err := getParts([]byte(f.String()))
-		if err != nil {
-			return xerrors.Errorf("failed to get keyVersion: %w", err)
+		val := []byte(f.String())
+		if !isEncrypted(val) {
+			return xerrors.New("trying to decrypt unencrypted value")
 		}
+
+		keyVersion, nonce, val, err := getParts(val)
+		if err != nil {
+			return xerrors.Errorf("failed to get parts from value: %w", err)
+		}
+
 		aead, ok := m.aeadMap[keyVersion]
 		if !ok {
 			return xerrors.Errorf("unknown keyVersion %d during decryption", keyVersion)
@@ -112,22 +118,20 @@ func (m *EncryptionManager) Decrypt(ef EncryptableFields) error {
 		}
 		f.SetString(string(plainText))
 	}
-
-	ef.SetEncrypted(false)
 	return nil
 }
 
-func getTypeAndValue(ef EncryptableFields) (reflect.Type, *reflect.Value, error) {
-	t := reflect.TypeOf(ef)
-	v := reflect.ValueOf(ef)
+func getReflectedTypeAndValue(i interface{}) (reflect.Type, *reflect.Value, error) {
+	t := reflect.TypeOf(i)
+	v := reflect.ValueOf(i)
 
-	if ef == nil {
+	if i == nil {
 		return nil, nil, xerrors.New("value is nil")
 	}
 	if v.Kind() != reflect.Ptr {
 		return nil, nil, xerrors.New("value is not a pointer")
 	}
-	if reflect.ValueOf(ef).IsNil() {
+	if reflect.ValueOf(i).IsNil() {
 		return nil, nil, xerrors.New("value is a nil pointer")
 	}
 
@@ -161,18 +165,35 @@ func getTaggedFieldNames(v *reflect.Value, t reflect.Type) ([]string, error) {
 	return fields, nil
 }
 
+func isEncrypted(val []byte) bool {
+	return bytes.Equal(val[0:magicBytesLen], magicBytes)
+}
+
 func getParts(b []byte) (Version, []byte, []byte, error) {
-	if len(b) < 25 {
+	startNonce := magicBytesLen + 1
+	endNonce := startNonce + chacha20poly1305.NonceSizeX
+
+	if len(b) < magicBytesLen+1+chacha20poly1305.NonceSizeX {
 		return 0, nil, nil, xerrors.New("invalid byte array")
 	}
-	if err := validateNonce(b[1:25]); err != nil {
-		return 0, nil, nil, xerrors.Errorf("invalid nonce during decryption: %w", err)
+	if err := validateNonce(b[startNonce:endNonce]); err != nil {
+		return 0, nil, nil, xerrors.Errorf("invalid nonce: %w", err)
 	}
-	return Version(b[0]), b[1:25], b[25:], nil
+	return Version(b[magicBytesLen]), b[startNonce:endNonce], b[endNonce:], nil
 }
 
 func setParts(keyVersion Version, nonce, val []byte) []byte {
-	return append(append([]byte{byte(keyVersion)}, nonce...), val...)
+	startNonce := magicBytesLen + 1
+	endNonce := startNonce + chacha20poly1305.NonceSizeX
+
+	out := make([]byte, magicBytesLen+1+chacha20poly1305.NonceSizeX+len(val))
+
+	copy(out[0:magicBytesLen], magicBytes) // magicBytes
+	out[magicBytesLen] = byte(keyVersion)  // version
+	copy(out[startNonce:endNonce], nonce)  // nonce
+	copy(out[endNonce:], val)              // value
+
+	return out
 }
 
 func generateNonce() ([]byte, error) {
