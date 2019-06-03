@@ -18,15 +18,26 @@ var (
 	paddingLen      = magicBytesLen + keyVersionLen + nonceLen
 )
 
+// EncryptedValue is a type for managing ciphertext values in a flexible way.
+// It is comprised of four elements:
+//
+//   magic bytes  version           nonce                      value
+// |-------------|-------|-------------------------|---------------------------|
+//
+// ① magic bytes - A series of bytes used for detecting encryption state.
+// ② version     - A byte representing the version of the key used to encrypt
+//                  the value. This allows for migrating to new key values.
+// ③ nonce       - A unique value required for decryption.
+// ④ value       - The ciphertext value.
 type EncryptedValue []byte
 
-func NewEncryptedValue(keyVersion byte, nonce, val []byte) EncryptedValue {
-	data := make([]byte, paddingLen+len(val))
+func NewEncryptedValue(version byte, nonce, value []byte) EncryptedValue {
+	data := make([]byte, paddingLen+len(value))
 
 	copy(data[0:magicBytesLen], magicBytes) // magic bytes
-	data[keyVersionIndex] = keyVersion      // key version
+	data[keyVersionIndex] = version         // version
 	copy(data[nonceStart:nonceEnd], nonce)  // nonce
-	copy(data[nonceEnd:], val)              // value
+	copy(data[nonceEnd:], value)            // value
 
 	return EncryptedValue(data)
 }
@@ -35,13 +46,13 @@ func FromByteSlice(val []byte) (EncryptedValue, error) {
 	if len(val) < paddingLen {
 		return nil, xerrors.New("invalid encrypted value")
 	}
-	if !Encrypted(val) {
+	if !encrypted(val) {
 		return nil, xerrors.New("cannot re-encrypt encrypted value")
 	}
 	return EncryptedValue(val), nil
 }
 
-func Encrypted(b []byte) bool {
+func encrypted(b []byte) bool {
 	return bytes.Equal(b[0:magicBytesLen], magicBytes)
 }
 

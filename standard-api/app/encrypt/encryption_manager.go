@@ -72,7 +72,7 @@ func (m *EncryptionManager) Encrypt(i interface{}) error {
 }
 
 func (m *EncryptionManager) encryptToString(s string) (string, error) {
-	if Encrypted([]byte(s)) {
+	if encrypted([]byte(s)) {
 		return "", xerrors.New("value is already encrypted")
 	}
 
@@ -81,8 +81,8 @@ func (m *EncryptionManager) encryptToString(s string) (string, error) {
 		return "", xerrors.Errorf("error generating nonce: %w")
 	}
 
-	cipherText := m.aeadMap[m.version].Seal(nil, nonce, []byte(s), nil)
-	return NewEncryptedValue(byte(m.version), nonce, cipherText).String(), nil
+	ciphertext := m.aeadMap[m.version].Seal(nil, nonce, []byte(s), nil)
+	return NewEncryptedValue(byte(m.version), nonce, ciphertext).String(), nil
 }
 
 // Decrypt decrypts all fields in i marked with the encrypt tag.
