@@ -3,6 +3,7 @@ package app
 import (
 	"database/sql"
 
+	"github.com/Jimeux/go-boilerplate/standard-api/app/encrypt"
 	"golang.org/x/xerrors"
 )
 
@@ -17,10 +18,10 @@ const (
 
 type DAO struct {
 	db         *sql.DB
-	encryption *EncryptionManager
+	encryption *encrypt.EncryptionManager
 }
 
-func NewDAO(db *sql.DB, encryption *EncryptionManager) *DAO {
+func NewDAO(db *sql.DB, encryption *encrypt.EncryptionManager) *DAO {
 	return &DAO{db: db, encryption: encryption}
 }
 
@@ -41,10 +42,10 @@ func (d *DAO) Create(m *Model) (*Model, error) {
 		return nil, xerrors.Errorf("error at LastInsertId: %w", err)
 	}
 
-	m.ID = lastID
 	if err := d.encryption.Decrypt(m); err != nil {
 		return nil, xerrors.Errorf("could not decrypt ID %d post-create: %w", lastID, err)
 	}
+	m.ID = lastID
 	return m, nil
 }
 
@@ -112,7 +113,6 @@ func (d *DAO) FindByID(id int64) (*Model, error) {
 	if err := d.encryption.Decrypt(&model); err != nil {
 		return nil, err
 	}
-
 	return &model, nil
 }
 
@@ -139,6 +139,5 @@ func (d *DAO) Update(m *Model) (*Model, error) {
 	if err := d.encryption.Decrypt(m); err != nil {
 		return nil, err
 	}
-
 	return m, nil
 }

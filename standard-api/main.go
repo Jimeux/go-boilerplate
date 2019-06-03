@@ -5,8 +5,10 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/Jimeux/go-boilerplate/standard-api/app"
 	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/Jimeux/go-boilerplate/standard-api/app"
+	"github.com/Jimeux/go-boilerplate/standard-api/app/encrypt"
 )
 
 const (
@@ -26,12 +28,12 @@ func main() {
 		db.Close()
 	}()
 
-	currentVersion := app.Version(1)
-	keyMap := app.KeyMap{
+	currentVersion := encrypt.Version(1)
+	keyMap := encrypt.KeyMap{
 		1: []byte("itWouldBeBadIfSomebodyFoundThis!"),
 		2: []byte("itWouldBeBadIfSomeoneFoundThis!!"),
 	}
-	encryptionManager, err := app.NewEncryptionManager(currentVersion, keyMap)
+	encryptionManager, err := encrypt.NewEncryptionManager(currentVersion, keyMap)
 	if err != nil {
 		log.Fatalln(err)
 	}
