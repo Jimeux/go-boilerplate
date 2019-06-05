@@ -8,14 +8,17 @@ import (
 )
 
 var (
-	magicBytes      = []byte{0xBE, 0xEF}
-	magicBytesLen   = len(magicBytes)
+	magicBytes    = []byte{0xBE, 0xEF}
+	magicBytesLen = len(magicBytes)
+
 	keyVersionIndex = magicBytesLen
 	keyVersionLen   = 1
-	nonceLen        = chacha20poly1305.NonceSizeX
-	nonceStart      = magicBytesLen + keyVersionLen
-	nonceEnd        = nonceStart + nonceLen
-	paddingLen      = magicBytesLen + keyVersionLen + nonceLen
+
+	nonceLen   = chacha20poly1305.NonceSizeX
+	nonceStart = magicBytesLen + keyVersionLen
+	nonceEnd   = nonceStart + nonceLen
+
+	paddingLen = magicBytesLen + keyVersionLen + nonceLen
 )
 
 // EncryptedValue is a type for managing ciphertext values in a flexible way.
@@ -27,10 +30,12 @@ var (
 // ① magic bytes - A series of bytes used for detecting encryption state.
 // ② version     - A byte representing the version of the key used to encrypt
 //                  the value. This allows for migrating to new key values.
-// ③ nonce       - A unique value required for decryption.
+// ③ nonce       - A unique value required for both encryption and decryption.
+//                  It must be generated uniquely for each ciphertext value.
 // ④ value       - The ciphertext value.
 type EncryptedValue []byte
 
+// NewEncryptedValue created an encryptedValue from its constituent parts
 func NewEncryptedValue(version byte, nonce, value []byte) EncryptedValue {
 	data := make([]byte, paddingLen+len(value))
 
@@ -42,6 +47,7 @@ func NewEncryptedValue(version byte, nonce, value []byte) EncryptedValue {
 	return EncryptedValue(data)
 }
 
+// fromByteSlice creates a validated encryptedValue from a byte slice
 func FromByteSlice(val []byte) (EncryptedValue, error) {
 	if len(val) < paddingLen {
 		return nil, xerrors.New("invalid encrypted value")
@@ -52,6 +58,7 @@ func FromByteSlice(val []byte) (EncryptedValue, error) {
 	return EncryptedValue(val), nil
 }
 
+// encrypted is true if the value stored in b is currently encrypted
 func encrypted(b []byte) bool {
 	return bytes.Equal(b[0:magicBytesLen], magicBytes)
 }

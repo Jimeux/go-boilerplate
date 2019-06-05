@@ -28,7 +28,7 @@ func main() {
 		db.Close()
 	}()
 
-	currentVersion := encrypt.Version(1)
+	currentVersion := encrypt.KeyVersion(1)
 	keyMap := encrypt.KeyMap{
 		1: []byte("itWouldBeBadIfSomebodyFoundThis!"),
 		2: []byte("itWouldBeBadIfSomeoneFoundThis!!"),

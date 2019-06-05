@@ -14,19 +14,27 @@ const (
 	tagValue = "true"
 )
 
-type (
-	Version byte
-	Key     []byte
-	KeyMap  map[Version]Key
-	aeadMap map[Version]cipher.AEAD
+var (
+	ErrNoTaggedFields = xerrors.New("struct has no fields marked with encrypt tag")
 )
 
+type (
+	KeyVersion byte
+	Key        []byte
+	KeyMap     map[KeyVersion]Key
+	aeadMap    map[KeyVersion]cipher.AEAD
+)
+
+// EncryptionManager is a type for managing encryption with an AEAD cipher.
+// It supports refreshing keys and prevents re-encrypting of encrypted values.
 type EncryptionManager struct {
 	aeadMap aeadMap
-	version Version
+	version KeyVersion
 }
 
-func NewEncryptionManager(version Version, keyMap KeyMap) (*EncryptionManager, error) {
+// NewEncryptionManager create an EncryptionManager that manages an AEAD cipher instance
+// for each key in keyMap. version is used as the default version for encryption.
+func NewEncryptionManager(version KeyVersion, keyMap KeyMap) (*EncryptionManager, error) {
 	if _, ok := keyMap[version]; !ok {
 		return nil, xerrors.Errorf("key not provided for version %d", version)
 	}
@@ -39,6 +47,7 @@ func NewEncryptionManager(version Version, keyMap KeyMap) (*EncryptionManager, e
 		}
 		aeadMap[version] = aead
 	}
+
 	return &EncryptionManager{
 		aeadMap: aeadMap,
 		version: version,
@@ -117,7 +126,7 @@ func (m *EncryptionManager) decryptFromString(s string) (string, error) {
 		return "", xerrors.Errorf("could not decrypt string: %w", err)
 	}
 
-	aead, ok := m.aeadMap[Version(ev.KeyVersion())]
+	aead, ok := m.aeadMap[KeyVersion(ev.KeyVersion())]
 	if !ok {
 		return "", xerrors.Errorf("unknown keyVersion %d during decryption", ev.KeyVersion())
 	}
@@ -169,7 +178,7 @@ func getTaggedFieldIndexes(v *reflect.Value, t reflect.Type) ([]int, error) {
 	}
 
 	if len(fields) == 0 {
-		return nil, xerrors.New("struct has no encryptable fields marked with encrypt tag")
+		return nil, ErrNoTaggedFields
 	}
 	return fields, nil
 }
