@@ -22,13 +22,13 @@ type TagEncrypter struct {
 }
 
 func NewTagEncrypter(version KeyVersion, keyMap KeyMap) (*TagEncrypter, error) {
-	manager, err := NewEncrypter(version, keyMap)
+	encrypter, err := NewEncrypter(version, keyMap)
 	if err != nil {
 		return nil, xerrors.Errorf("could not create TagEncrypter: %w", err)
 	}
 
 	return &TagEncrypter{
-		encrypter: manager,
+		encrypter: encrypter,
 	}, nil
 }
 
@@ -42,7 +42,7 @@ func (m *TagEncrypter) Encrypt(i interface{}) error {
 
 	indexes, err := getTaggedFieldIndexes(v, t)
 	if err != nil {
-		return xerrors.Errorf("failed to get field names for encryption: %w", err)
+		return xerrors.Errorf("failed to get field indexes for encryption: %w", err)
 	}
 
 	for _, index := range indexes {
@@ -68,7 +68,7 @@ func (m *TagEncrypter) Decrypt(i interface{}) error {
 
 	indexes, err := getTaggedFieldIndexes(v, t)
 	if err != nil {
-		return xerrors.Errorf("failed to get field names for decryption: %w", err)
+		return xerrors.Errorf("failed to get field indexes for decryption: %w", err)
 	}
 
 	for _, index := range indexes {
@@ -102,14 +102,14 @@ func getReflectedTypeAndValue(i interface{}) (reflect.Type, *reflect.Value, erro
 	return t, &v, nil
 }
 
-// getTaggedFieldIndexes returns field names from struct v that are
-// marked with encrypt=true meta tag.
+// getTaggedFieldIndexes returns field indexes from struct v that
+// are marked with encrypt=true meta-tag.
 func getTaggedFieldIndexes(v *reflect.Value, t reflect.Type) ([]int, error) {
 	if v.Kind() != reflect.Struct {
 		return nil, xerrors.New("cannot encrypt non-struct value")
 	}
 
-	var fields []int
+	var indexes []int
 	for i := 0; i < v.NumField(); i++ {
 		field := t.Elem().Field(i)
 		tag := field.Tag.Get(tagName)
@@ -118,12 +118,12 @@ func getTaggedFieldIndexes(v *reflect.Value, t reflect.Type) ([]int, error) {
 			if field.Type.Kind() != reflect.String {
 				return nil, xerrors.New("encrypt fields must be of type string")
 			}
-			fields = append(fields, i)
+			indexes = append(indexes, i)
 		}
 	}
 
-	if len(fields) == 0 {
+	if len(indexes) == 0 {
 		return nil, ErrNoTaggedFields
 	}
-	return fields, nil
+	return indexes, nil
 }

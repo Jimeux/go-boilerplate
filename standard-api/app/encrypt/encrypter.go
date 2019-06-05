@@ -59,7 +59,7 @@ func (m *Encrypter) Encrypt(b []byte) (EncryptedValue, error) {
 }
 
 func (m *Encrypter) Decrypt(b []byte) ([]byte, error) {
-	ev, err := FromByteSlice(b)
+	ev, err := EncryptedValueFromByteSlice(b)
 	if err != nil {
 		return nil, xerrors.Errorf("could not decrypt string: %w", err)
 	}

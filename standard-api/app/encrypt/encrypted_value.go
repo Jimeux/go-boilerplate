@@ -16,7 +16,8 @@ var (
 
 	nonceLen   = chacha20poly1305.NonceSizeX
 	nonceStart = magicBytesLen + keyVersionLen
-	nonceEnd   = nonceStart + nonceLen
+
+	valueStart = nonceStart + nonceLen
 
 	paddingLen = magicBytesLen + keyVersionLen + nonceLen
 )
@@ -39,23 +40,23 @@ type EncryptedValue []byte
 func NewEncryptedValue(version byte, nonce, value []byte) EncryptedValue {
 	data := make([]byte, paddingLen+len(value))
 
-	copy(data[0:magicBytesLen], magicBytes) // magic bytes
-	data[keyVersionIndex] = version         // version
-	copy(data[nonceStart:nonceEnd], nonce)  // nonce
-	copy(data[nonceEnd:], value)            // value
+	copy(data[0:magicBytesLen], magicBytes)  // magic bytes
+	data[keyVersionIndex] = version          // version
+	copy(data[nonceStart:valueStart], nonce) // nonce
+	copy(data[valueStart:], value)           // value
 
 	return EncryptedValue(data)
 }
 
 // fromByteSlice creates a validated encryptedValue from a byte slice
-func FromByteSlice(val []byte) (EncryptedValue, error) {
-	if len(val) < paddingLen {
+func EncryptedValueFromByteSlice(b []byte) (EncryptedValue, error) {
+	if len(b) < paddingLen {
 		return nil, xerrors.New("invalid encrypted value")
 	}
-	if !encrypted(val) {
+	if !encrypted(b) {
 		return nil, xerrors.New("cannot re-encrypt encrypted value")
 	}
-	return EncryptedValue(val), nil
+	return EncryptedValue(b), nil
 }
 
 // encrypted is true if the value stored in b is currently encrypted
@@ -72,9 +73,9 @@ func (v EncryptedValue) KeyVersion() byte {
 }
 
 func (v EncryptedValue) Nonce() []byte {
-	return v[nonceStart:nonceEnd]
+	return v[nonceStart:valueStart]
 }
 
 func (v EncryptedValue) Value() []byte {
-	return v[nonceEnd:]
+	return v[valueStart:]
 }
