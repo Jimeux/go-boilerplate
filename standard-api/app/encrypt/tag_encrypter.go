@@ -1,11 +1,8 @@
 package encrypt
 
 import (
-	"crypto/cipher"
-	"crypto/rand"
 	"reflect"
 
-	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/xerrors"
 )
 
@@ -18,45 +15,26 @@ var (
 	ErrNoTaggedFields = xerrors.New("struct has no fields marked with encrypt tag")
 )
 
-type (
-	KeyVersion byte
-	Key        []byte
-	KeyMap     map[KeyVersion]Key
-	aeadMap    map[KeyVersion]cipher.AEAD
-)
-
-// EncryptionManager is a type for managing encryption with an AEAD cipher.
-// It supports refreshing keys and prevents re-encrypting of encrypted values.
-type EncryptionManager struct {
-	aeadMap aeadMap
-	version KeyVersion
+// TagEncrypter is a type for automatically encrypting/decrypting
+// struct fields marked with the 'encrypt' meta-tag via reflection.
+type TagEncrypter struct {
+	encrypter *Encrypter
 }
 
-// NewEncryptionManager create an EncryptionManager that manages an AEAD cipher instance
-// for each key in keyMap. version is used as the default version for encryption.
-func NewEncryptionManager(version KeyVersion, keyMap KeyMap) (*EncryptionManager, error) {
-	if _, ok := keyMap[version]; !ok {
-		return nil, xerrors.Errorf("key not provided for version %d", version)
+func NewTagEncrypter(version KeyVersion, keyMap KeyMap) (*TagEncrypter, error) {
+	manager, err := NewEncrypter(version, keyMap)
+	if err != nil {
+		return nil, xerrors.Errorf("could not create TagEncrypter: %w", err)
 	}
 
-	aeadMap := make(aeadMap)
-	for version, key := range keyMap {
-		aead, err := chacha20poly1305.NewX(key)
-		if err != nil {
-			return nil, xerrors.Errorf("Failed to instantiate XChaCha20-Poly1305 with given key: %w", err)
-		}
-		aeadMap[version] = aead
-	}
-
-	return &EncryptionManager{
-		aeadMap: aeadMap,
-		version: version,
+	return &TagEncrypter{
+		encrypter: manager,
 	}, nil
 }
 
 // Encrypt encrypts all fields in i marked with the encrypt tag.
 // i must be a pointer to a struct with at least one tagged field.
-func (m *EncryptionManager) Encrypt(i interface{}) error {
+func (m *TagEncrypter) Encrypt(i interface{}) error {
 	t, v, err := getReflectedTypeAndValue(i)
 	if err != nil {
 		return xerrors.Errorf("failed to parse encrypt input: %w", err)
@@ -70,33 +48,19 @@ func (m *EncryptionManager) Encrypt(i interface{}) error {
 	for _, index := range indexes {
 		f := v.Field(index)
 
-		encVal, err := m.encryptToString(f.String())
+		encVal, err := m.encrypter.Encrypt([]byte(f.String()))
 		if err != nil {
 			return xerrors.Errorf("could not encrypt string: %w", err)
 		}
 
-		f.SetString(encVal)
+		f.SetString(encVal.String())
 	}
 	return nil
 }
 
-func (m *EncryptionManager) encryptToString(s string) (string, error) {
-	if encrypted([]byte(s)) {
-		return "", xerrors.New("value is already encrypted")
-	}
-
-	nonce := make([]byte, chacha20poly1305.NonceSizeX)
-	if _, err := rand.Read(nonce); err != nil {
-		return "", xerrors.Errorf("error generating nonce: %w")
-	}
-
-	ciphertext := m.aeadMap[m.version].Seal(nil, nonce, []byte(s), nil)
-	return NewEncryptedValue(byte(m.version), nonce, ciphertext).String(), nil
-}
-
 // Decrypt decrypts all fields in i marked with the encrypt tag.
 // i must be a pointer to a struct with at least one tagged field.
-func (m *EncryptionManager) Decrypt(i interface{}) error {
+func (m *TagEncrypter) Decrypt(i interface{}) error {
 	t, v, err := getReflectedTypeAndValue(i)
 	if err != nil {
 		return xerrors.Errorf("failed to parse decrypt input: %w", err)
@@ -110,33 +74,14 @@ func (m *EncryptionManager) Decrypt(i interface{}) error {
 	for _, index := range indexes {
 		f := v.Field(index)
 
-		plainText, err := m.decryptFromString(f.String())
+		plainText, err := m.encrypter.Decrypt([]byte(f.String()))
 		if err != nil {
 			return xerrors.Errorf("could not decrypt string: %w", err)
 		}
 
-		f.SetString(plainText)
+		f.SetString(string(plainText))
 	}
 	return nil
-}
-
-func (m *EncryptionManager) decryptFromString(s string) (string, error) {
-	ev, err := FromByteSlice([]byte(s))
-	if err != nil {
-		return "", xerrors.Errorf("could not decrypt string: %w", err)
-	}
-
-	aead, ok := m.aeadMap[KeyVersion(ev.KeyVersion())]
-	if !ok {
-		return "", xerrors.Errorf("unknown keyVersion %d during decryption", ev.KeyVersion())
-	}
-
-	plainText, err := aead.Open(nil, ev.Nonce(), ev.Value(), nil)
-	if err != nil {
-		return "", xerrors.Errorf("failed to decrypt or authenticate value: %w", err)
-	}
-
-	return string(plainText), nil
 }
 
 func getReflectedTypeAndValue(i interface{}) (reflect.Type, *reflect.Value, error) {

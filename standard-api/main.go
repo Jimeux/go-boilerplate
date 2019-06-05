@@ -33,11 +33,11 @@ func main() {
 		1: []byte("itWouldBeBadIfSomebodyFoundThis!"),
 		2: []byte("itWouldBeBadIfSomeoneFoundThis!!"),
 	}
-	encryptionManager, err := encrypt.NewEncryptionManager(currentVersion, keyMap)
+	encrypter, err := encrypt.NewTagEncrypter(currentVersion, keyMap)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	dao := app.NewDAO(db, encryptionManager)
+	dao := app.NewDAO(db, encrypter)
 	controller := app.NewController(dao)
 
 	http.HandleFunc("/model/create", controller.Create)

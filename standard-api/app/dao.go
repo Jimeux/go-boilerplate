@@ -17,18 +17,18 @@ const (
 )
 
 type DAO struct {
-	db         *sql.DB
-	encryption *encrypt.EncryptionManager
+	db        *sql.DB
+	encrypter *encrypt.TagEncrypter
 }
 
-func NewDAO(db *sql.DB, encryption *encrypt.EncryptionManager) *DAO {
-	return &DAO{db: db, encryption: encryption}
+func NewDAO(db *sql.DB, encrypter *encrypt.TagEncrypter) *DAO {
+	return &DAO{db: db, encrypter: encrypter}
 }
 
 // Createはmの値で新規レコードをDBに保存する。
 // IDを含んだModelのインスタンスを返却する。
 func (d *DAO) Create(m *Model) (*Model, error) {
-	if err := d.encryption.Encrypt(m); err != nil {
+	if err := d.encrypter.Encrypt(m); err != nil {
 		return nil, xerrors.Errorf("could not encrypt pre-create: %w", err)
 	}
 
@@ -42,7 +42,7 @@ func (d *DAO) Create(m *Model) (*Model, error) {
 		return nil, xerrors.Errorf("error at LastInsertId: %w", err)
 	}
 
-	if err := d.encryption.Decrypt(m); err != nil {
+	if err := d.encrypter.Decrypt(m); err != nil {
 		return nil, xerrors.Errorf("could not decrypt ID %d post-create: %w", lastID, err)
 	}
 	m.ID = lastID
@@ -82,7 +82,7 @@ func (d *DAO) FindAll(offset, limit int) ([]Model, error) {
 		}
 
 		// 復号化
-		if err := d.encryption.Decrypt(&m); err != nil {
+		if err := d.encrypter.Decrypt(&m); err != nil {
 			return nil, xerrors.Errorf("row decryption error: %w", err)
 		}
 
@@ -110,7 +110,7 @@ func (d *DAO) FindByID(id int64) (*Model, error) {
 	}
 
 	// 復号化
-	if err := d.encryption.Decrypt(&model); err != nil {
+	if err := d.encrypter.Decrypt(&model); err != nil {
 		return nil, err
 	}
 	return &model, nil
@@ -119,7 +119,7 @@ func (d *DAO) FindByID(id int64) (*Model, error) {
 // UpdateはmのDB上のレコードを更新する。
 // m.IDのModelが存在しない、または変更点がない場合はnilを返却する。
 func (d *DAO) Update(m *Model) (*Model, error) {
-	if err := d.encryption.Encrypt(m); err != nil {
+	if err := d.encrypter.Encrypt(m); err != nil {
 		return nil, xerrors.Errorf("could not encrypt pre-update: %w", err)
 	}
 
@@ -136,7 +136,7 @@ func (d *DAO) Update(m *Model) (*Model, error) {
 		return nil, nil
 	}
 
-	if err := d.encryption.Decrypt(m); err != nil {
+	if err := d.encrypter.Decrypt(m); err != nil {
 		return nil, err
 	}
 	return m, nil
