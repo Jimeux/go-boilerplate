@@ -12,11 +12,11 @@ const (
 )
 
 var (
-	ErrNoTaggedFields = xerrors.New("struct has no fields marked with encrypt tag")
+	ErrNoTaggedFields = xerrors.New("struct has no fields marked with encrypt meta tag")
 )
 
 // TagEncrypter is a type for automatically encrypting/decrypting
-// struct fields marked with the 'encrypt' meta-tag via reflection.
+// struct fields marked with the 'encrypt' meta tag via reflection.
 type TagEncrypter struct {
 	encrypter *Encrypter
 }
@@ -99,16 +99,15 @@ func getReflectedTypeAndValue(i interface{}) (reflect.Type, *reflect.Value, erro
 	}
 
 	v = reflect.Indirect(v) // return value v points to
+	if v.Kind() != reflect.Struct {
+		return nil, nil, xerrors.New("cannot encrypt non-struct value")
+	}
 	return t, &v, nil
 }
 
 // getTaggedFieldIndexes returns field indexes from struct v that
-// are marked with encrypt=true meta-tag.
+// are marked with encrypt=true meta tag.
 func getTaggedFieldIndexes(v *reflect.Value, t reflect.Type) ([]int, error) {
-	if v.Kind() != reflect.Struct {
-		return nil, xerrors.New("cannot encrypt non-struct value")
-	}
-
 	var indexes []int
 	for i := 0; i < v.NumField(); i++ {
 		field := t.Elem().Field(i)

@@ -36,7 +36,7 @@ var (
 // ④ value       - The ciphertext value.
 type EncryptedValue []byte
 
-// NewEncryptedValue created an encryptedValue from its constituent parts
+// NewEncryptedValue created an EncryptedValue from its constituent parts.
 func NewEncryptedValue(version byte, nonce, value []byte) EncryptedValue {
 	data := make([]byte, paddingLen+len(value))
 
@@ -48,18 +48,18 @@ func NewEncryptedValue(version byte, nonce, value []byte) EncryptedValue {
 	return EncryptedValue(data)
 }
 
-// fromByteSlice creates a validated encryptedValue from a byte slice
+// EncryptedValueFromByteSlice creates a validated EncryptedValue from a byte slice.
 func EncryptedValueFromByteSlice(b []byte) (EncryptedValue, error) {
 	if len(b) < paddingLen {
 		return nil, xerrors.New("invalid encrypted value")
 	}
 	if !encrypted(b) {
-		return nil, xerrors.New("cannot re-encrypt encrypted value")
+		return nil, xerrors.New("cannot decrypt unencrypted value")
 	}
 	return EncryptedValue(b), nil
 }
 
-// encrypted is true if the value stored in b is currently encrypted
+// encrypted is true if the value stored in b is currently encrypted.
 func encrypted(b []byte) bool {
 	return bytes.Equal(b[0:magicBytesLen], magicBytes)
 }
