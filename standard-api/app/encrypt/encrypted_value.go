@@ -51,7 +51,7 @@ func NewEncryptedValue(version byte, nonce, value []byte) EncryptedValue {
 // EncryptedValueFromByteSlice creates a validated EncryptedValue from a byte slice.
 func EncryptedValueFromByteSlice(b []byte) (EncryptedValue, error) {
 	if len(b) < paddingLen {
-		return nil, xerrors.New("invalid encrypted value")
+		return nil, xerrors.New("byte slice does not contain encryption padding data")
 	}
 	if !encrypted(b) {
 		return nil, xerrors.New("cannot decrypt unencrypted value")
@@ -61,7 +61,7 @@ func EncryptedValueFromByteSlice(b []byte) (EncryptedValue, error) {
 
 // encrypted is true if the value stored in b is currently encrypted.
 func encrypted(b []byte) bool {
-	return bytes.Equal(b[0:magicBytesLen], magicBytes)
+	return len(b) >= paddingLen && bytes.Equal(b[0:magicBytesLen], magicBytes)
 }
 
 func (v EncryptedValue) String() string {
