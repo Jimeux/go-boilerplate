@@ -3,6 +3,7 @@ package app
 import (
 	"database/sql"
 
+	"github.com/Jimeux/go-boilerplate/standard-api/app/encrypt"
 	"golang.org/x/xerrors"
 )
 
@@ -16,16 +17,21 @@ const (
 )
 
 type DAO struct {
-	db *sql.DB
+	db        *sql.DB
+	encrypter *encrypt.TagEncrypter
 }
 
-func NewDAO(db *sql.DB) *DAO {
-	return &DAO{db: db}
+func NewDAO(db *sql.DB, encrypter *encrypt.TagEncrypter) *DAO {
+	return &DAO{db: db, encrypter: encrypter}
 }
 
 // Createはmの値で新規レコードをDBに保存する。
 // IDを含んだModelのインスタンスを返却する。
 func (d *DAO) Create(m *Model) (*Model, error) {
+	if err := d.encrypter.Encrypt(m); err != nil {
+		return nil, xerrors.Errorf("could not encrypt pre-create: %w", err)
+	}
+
 	res, err := d.db.Exec(createStmt, m.Name)
 	if err != nil {
 		return nil, xerrors.Errorf("error at exec: %w", err)
@@ -36,6 +42,9 @@ func (d *DAO) Create(m *Model) (*Model, error) {
 		return nil, xerrors.Errorf("error at LastInsertId: %w", err)
 	}
 
+	if err := d.encrypter.Decrypt(m); err != nil {
+		return nil, xerrors.Errorf("could not decrypt ID %d post-create: %w", lastID, err)
+	}
 	m.ID = lastID
 	return m, nil
 }
@@ -71,10 +80,16 @@ func (d *DAO) FindAll(offset, limit int) ([]Model, error) {
 		if err := rows.Scan(&m.ID, &m.Name); err != nil {
 			return nil, xerrors.Errorf("error at rows.Scan: %w", err)
 		}
+
+		// 復号化
+		if err := d.encrypter.Decrypt(&m); err != nil {
+			return nil, xerrors.Errorf("row decryption error: %w", err)
+		}
+
 		models = append(models, m)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, xerrors.Errorf("row iteration error: %v", err)
+		return nil, xerrors.Errorf("row iteration error: %w", err)
 	}
 
 	return models, nil
@@ -93,12 +108,21 @@ func (d *DAO) FindByID(id int64) (*Model, error) {
 	if err != nil {
 		return nil, xerrors.Errorf("error at Scan: %w", err)
 	}
+
+	// 復号化
+	if err := d.encrypter.Decrypt(&model); err != nil {
+		return nil, err
+	}
 	return &model, nil
 }
 
 // UpdateはmのDB上のレコードを更新する。
 // m.IDのModelが存在しない、または変更点がない場合はnilを返却する。
 func (d *DAO) Update(m *Model) (*Model, error) {
+	if err := d.encrypter.Encrypt(m); err != nil {
+		return nil, xerrors.Errorf("could not encrypt pre-update: %w", err)
+	}
+
 	res, err := d.db.Exec(updateStmt, m.Name, m.ID)
 	if err != nil {
 		return nil, xerrors.Errorf("error at Exec: %w", err)
@@ -112,5 +136,8 @@ func (d *DAO) Update(m *Model) (*Model, error) {
 		return nil, nil
 	}
 
+	if err := d.encrypter.Decrypt(m); err != nil {
+		return nil, err
+	}
 	return m, nil
 }

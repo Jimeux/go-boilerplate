@@ -5,8 +5,10 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/Jimeux/go-boilerplate/standard-api/app"
 	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/Jimeux/go-boilerplate/standard-api/app"
+	"github.com/Jimeux/go-boilerplate/standard-api/app/encrypt"
 )
 
 const (
@@ -26,7 +28,16 @@ func main() {
 		db.Close()
 	}()
 
-	dao := app.NewDAO(db)
+	currentVersion := encrypt.KeyVersion(1)
+	keyMap := encrypt.KeyMap{
+		1: []byte("itWouldBeBadIfSomebodyFoundThis!"),
+		2: []byte("itWouldBeBadIfSomeoneFoundThis!!"),
+	}
+	encrypter, err := encrypt.NewTagEncrypter(currentVersion, keyMap)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	dao := app.NewDAO(db, encrypter)
 	controller := app.NewController(dao)
 
 	http.HandleFunc("/model/create", controller.Create)

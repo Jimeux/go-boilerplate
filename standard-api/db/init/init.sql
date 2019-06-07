@@ -1,7 +1,7 @@
 create table if not exists model
 (
-  id   int auto_increment primary key,
-  name varchar(255)
+    id    int auto_increment primary key,
+    name  varbinary(255) not null
 );
 
 insert into model (name)
