@@ -26,12 +26,7 @@ func TestEncrypter_NewEncrypter(t *testing.T) {
 	})
 }
 func TestEncrypter_Encrypt(t *testing.T) {
-	currentVersion := KeyVersion(1)
-	keyMap := KeyMap{
-		1: []byte("itWouldBeBadIfSomebodyFoundThis!"),
-		2: []byte("itWouldBeBadIfSomeoneFoundThis!!"),
-	}
-	encrypter, _ := NewEncrypter(currentVersion, keyMap)
+	encrypter := buildValidEncrypter(1)
 	val := []byte("hello")
 
 	t.Run("encrypts byte slice", func(t *testing.T) {
@@ -46,8 +41,8 @@ func TestEncrypter_Encrypt(t *testing.T) {
 		if !encrypted(ev) {
 			t.Errorf("expected value to be encrypted: %s", ev)
 		}
-		if ev.KeyVersion() != byte(currentVersion) {
-			t.Errorf("expected version %d but got %d", currentVersion, ev.KeyVersion())
+		if ev.KeyVersion() != byte(1) {
+			t.Errorf("expected version %d but got %d", 1, ev.KeyVersion())
 		}
 	})
 	t.Run("does not re-encrypt encrypted values", func(t *testing.T) {
@@ -63,12 +58,7 @@ func TestEncrypter_Encrypt(t *testing.T) {
 }
 
 func TestEncrypter_Decrypt(t *testing.T) {
-	currentVersion := KeyVersion(1)
-	keyMap := KeyMap{
-		1: []byte("itWouldBeBadIfSomebodyFoundThis!"),
-		2: []byte("itWouldBeBadIfSomeoneFoundThis!!"),
-	}
-	encrypter, _ := NewEncrypter(currentVersion, keyMap)
+	encrypter := buildValidEncrypter(1)
 	val := []byte("hello")
 
 	t.Run("decrypts byte slices", func(t *testing.T) {
@@ -116,6 +106,60 @@ func TestEncrypter_Decrypt(t *testing.T) {
 		}
 	})
 	t.Run("supports key transitioning", func(t *testing.T) {
-		t.SkipNow() // TODO 2019-06-07 @Jimeux
+		val := []byte("hello")
+		v1 := buildValidEncrypter(1)
+		v2 := buildValidEncrypter(2)
+
+		ev, _ := v1.Encrypt(val)
+		b, err := v2.Decrypt(ev)
+
+		if err != nil {
+			t.Errorf("expected no error: %v", err)
+		}
+		if encrypted(b) {
+			t.Errorf("encrypted was true for %s", b)
+		}
+		if !bytes.Equal(b, val) {
+			t.Errorf("decrypted value %s does not match original %s", b, val)
+		}
 	})
+}
+
+func buildValidEncrypter(version int) *Encrypter {
+	currentVersion := KeyVersion(version)
+	keyMap := KeyMap{
+		1: []byte("itWouldBeBadIfSomebodyFoundThis!"),
+		2: []byte("itWouldBeBadIfSomebodyFoundThat!"),
+	}
+	encrypter, _ := NewEncrypter(currentVersion, keyMap)
+	return encrypter
+}
+
+func BenchmarkEncrypter_Encrypt(b *testing.B) {
+	encrypter := buildValidEncrypter(1)
+	v := []byte("value")
+
+	for i := 0; i < b.N; i++ {
+		_, _ = encrypter.Encrypt(v)
+	}
+}
+
+func BenchmarkEncrypter_EncryptStruct(b *testing.B) {
+	encrypter := buildValidEncrypter(1)
+	tagged := &Tagged{"unaffected", "value1", "value2"}
+
+	for i := 0; i < b.N; i++ {
+		t := *tagged
+		_, _ = encrypter.Encrypt([]byte(t.Value1))
+		_, _ = encrypter.Encrypt([]byte(t.Value2))
+	}
+}
+
+func BenchmarkEncrypter_Decrypt(b *testing.B) {
+	encrypter := buildValidEncrypter(1)
+	ev, _ := encrypter.Encrypt([]byte("value"))
+
+	for i := 0; i < b.N; i++ {
+		_, _ = encrypter.Decrypt(ev)
+	}
 }

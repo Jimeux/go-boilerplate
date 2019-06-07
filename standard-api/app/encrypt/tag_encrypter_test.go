@@ -99,3 +99,26 @@ func TestTagEncrypter_Decrypt(t *testing.T) {
 		}
 	})
 }
+
+func BenchmarkTagEncrypter_Encrypt(b *testing.B) {
+	keyMap := KeyMap{1: []byte("itWouldBeBadIfSomebodyFoundThis!")}
+	encrypter, _ := NewTagEncrypter(KeyVersion(1), keyMap)
+	tagged := &Tagged{"unaffected", "value1", "value2"}
+
+	for i := 0; i < b.N; i++ {
+		t := *tagged
+		_ = encrypter.Encrypt(&t)
+	}
+}
+
+func BenchmarkTagEncrypter_Decrypt(b *testing.B) {
+	keyMap := KeyMap{1: []byte("itWouldBeBadIfSomebodyFoundThis!")}
+	encrypter, _ := NewTagEncrypter(KeyVersion(1), keyMap)
+	tagged := &Tagged{"unaffected", "value1", "value2"}
+	_ = encrypter.Encrypt(tagged)
+
+	for i := 0; i < b.N; i++ {
+		t := *tagged
+		_ = encrypter.Decrypt(&t)
+	}
+}
